@@ -3,10 +3,11 @@ import requests
 import argparse
 import time
 
-api_flights_url = 'https://api.skypicker.com/flights'
-api_booking_url = 'http://128.199.48.38:8080/booking'
+API_FLIGHTS_URL = 'https://api.skypicker.com/flights'
+API_BOOKING_URL = 'http://128.199.48.38:8080/booking'
 
-personal_details = {
+DEFAULT_CURRENCY = 'EUR'
+PERSONAL_DETAILS = {
     'lastName': 'Bílek',
     'firstName': 'Jan',
     'birthday': '2018-02-12',
@@ -14,6 +15,8 @@ personal_details = {
     'email': 'honza@elisiondesign.cz',
     'documentID': '4029240922'
 }
+
+arguments = None
 
 
 def get_args():
@@ -51,10 +54,14 @@ def build_request_params(args):
     params['bags'] = args.bags
     date = time.strptime(args.date, '%Y-%m-%d')
     params['dateFrom'] = time.strftime('%d/%m/%Y', date)
-    params['dateTo'] = params['dateFrom']
+    params['dateTo'] = params.get('dateFrom')
+    params['limit'] = 1
 
-    if (args.fastest is False):
-        params['one_per_date'] = 1
+    if (args.fastest is True):
+        params['sort'] = 'duration'
+    else:
+        params['sort'] = 'price'
+
     if (args.return_flight is not None):
         params['daysInDestinationFrom'] = args.return_flight
         params['daysInDestinationTo'] = args.return_flight
@@ -62,32 +69,48 @@ def build_request_params(args):
     return params
 
 
-def find_flights(payload):
+def find_flight(params):
     try:
-        response = requests.get(api_flights_url, payload)
+        response = requests.get(API_FLIGHTS_URL, params)
         response.raise_for_status()
-        return response.json()
+        return response.json().get('data')
     except requests.exceptions.HTTPError as error:
         print('Http error: {}'.format(error))
         return -1
     except requests.exceptions.RequestException as error:
         print('Request exception: {}'.format(error))
+        return -1
 
 
 def book_flight(flight_data):
-    confirmation_code = 'aasf'
-    return confirmation_code
+    payload = dict()
+    payload['passengers'] = PERSONAL_DETAILS
+    payload['currency'] = DEFAULT_CURRENCY
+    payload['bags'] = arguments.bags
+    payload['booking_token'] = flight_data.get('booking_token')
+    try:
+        headers = {'Content-Type': 'application/json'}
+        response = requests.post(
+            API_BOOKING_URL, headers=headers, json=payload)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.HTTPError as error:
+        print('Http error: {}'.format(error))
+        print(response.text)
+        return -1
+    except requests.exceptions.RequestException as error:
+        print('Request exception: {}'.format(error))
+        return -1
 
 
 def main():
-    args = get_args()
-    request_params = build_request_params(args)
-    print(request_params)
-    flight_data = find_flights(request_params)
-    print(flight_data)
-    confirmation_code = book_flight(flight_data)
-    print(confirmation_code)
-
+    global arguments
+    arguments = get_args()
+    request_params = build_request_params(arguments)
+    flight_data = find_flight(request_params)
+    confirmation = book_flight(flight_data[0])
+    print('Booking number: {}'.format(confirmation.get('pnr')))
+    print('Confirmation status: {}'.format(confirmation.get('status')))
 
 if __name__ == '__main__':
     main()
