@@ -65,6 +65,7 @@ def build_request_params(args):
     if (args.return_flight is not None):
         params['daysInDestinationFrom'] = args.return_flight
         params['daysInDestinationTo'] = args.return_flight
+        params['typeFlight'] = 'round'
 
     return params
 
