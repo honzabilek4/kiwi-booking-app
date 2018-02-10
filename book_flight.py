@@ -103,14 +103,27 @@ def book_flight(flight_data):
         return -1
 
 
+def print_flight_details(confirmation, flight_details):
+    cityFrom = flight_details.get('cityFrom')
+    flyFrom = flight_details.get('flyFrom')
+    cityTo = flight_details.get('cityTo')
+    flyTo = flight_details.get('flyTo')
+    price = flight_details.get('price')
+    print('Booking number: {}'.format(confirmation.get('pnr')))
+    print('Confirmation status: {}'.format(confirmation.get('status')))
+    print('From: {} {}'.format(cityFrom, flyFrom))
+    print('To: {} {}'.format(cityTo, flyTo))
+    print('Total: {} {}'.format(price, DEFAULT_CURRENCY))
+
+
 def main():
     global arguments
     arguments = get_args()
     request_params = build_request_params(arguments)
-    flight_data = find_flight(request_params)
-    confirmation = book_flight(flight_data[0])
-    print('Booking number: {}'.format(confirmation.get('pnr')))
-    print('Confirmation status: {}'.format(confirmation.get('status')))
+    flight_data = find_flight(request_params)[0]
+    confirmation = book_flight(flight_data)
+    print_flight_details(confirmation, flight_data)
+
 
 if __name__ == '__main__':
     main()
