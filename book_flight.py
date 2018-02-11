@@ -2,6 +2,7 @@ import json
 import requests
 import argparse
 import time
+import sys
 
 API_FLIGHTS_URL = 'https://api.skypicker.com/flights'
 API_BOOKING_URL = 'http://128.199.48.38:8080/booking'
@@ -15,8 +16,6 @@ PERSONAL_DETAILS = {
     'email': 'honza@elisiondesign.cz',
     'documentID': '4029240922'
 }
-
-arguments = None
 
 
 def get_args():
@@ -74,20 +73,27 @@ def find_flight(params):
     try:
         response = requests.get(API_FLIGHTS_URL, params)
         response.raise_for_status()
-        return response.json().get('data')
+        found_flights = response.json().get('data')
+        if(len(found_flights) > 0):
+            return found_flights[0]
+        else:
+            raise Exception('No flights were found for specified parameters.')
     except requests.exceptions.HTTPError as error:
         print('Http error: {}'.format(error))
         return -1
     except requests.exceptions.RequestException as error:
         print('Request exception: {}'.format(error))
         return -1
+    except Exception as error:
+        print(error)
+        sys.exit()
 
 
-def book_flight(flight_data):
+def book_flight(options, flight_data):
     payload = dict()
     payload['passengers'] = PERSONAL_DETAILS
     payload['currency'] = DEFAULT_CURRENCY
-    payload['bags'] = arguments.bags
+    payload['bags'] = options.bags
     payload['booking_token'] = flight_data.get('booking_token')
     try:
         headers = {'Content-Type': 'application/json'}
@@ -104,25 +110,34 @@ def book_flight(flight_data):
         return -1
 
 
-def print_flight_details(confirmation, flight_details):
+def print_flight_details(confirmation, flight_details):    
     cityFrom = flight_details.get('cityFrom')
     flyFrom = flight_details.get('flyFrom')
     cityTo = flight_details.get('cityTo')
     flyTo = flight_details.get('flyTo')
+    flyDuration = flight_details.get('fly_duration')
+    returnDuration = flight_details.get('return_duration')
     price = flight_details.get('price')
+    
     print('Booking number: {}'.format(confirmation.get('pnr')))
-    print('Confirmation status: {}'.format(confirmation.get('status')))
-    print('From: {} {}'.format(cityFrom, flyFrom))
-    print('To: {} {}'.format(cityTo, flyTo))
+    print('Confirmation status: {}'.format(confirmation.get('status')))    
+    for route in flight_details.get('route'):
+        print('From: {} {}'.format(route.get('cityFrom'), route.get('flyFrom')))        
+        print('To: {} {}'.format(route.get('cityTo'), route.get('flyTo')))
+    print('Duration: {}'.format(flyDuration))
+    if returnDuration is not None:
+        print('Return duration: {}'.format(returnDuration))
+    print('–'*24)
     print('Total: {} {}'.format(price, DEFAULT_CURRENCY))
+
+    # TODO: print back route
 
 
 def main():
-    global arguments
     arguments = get_args()
     request_params = build_request_params(arguments)
-    flight_data = find_flight(request_params)[0]
-    confirmation = book_flight(flight_data)
+    flight_data = find_flight(request_params)
+    confirmation = book_flight(arguments, flight_data)
     print_flight_details(confirmation, flight_data)
 
 
